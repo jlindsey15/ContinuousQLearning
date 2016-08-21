@@ -1,6 +1,6 @@
 import tensorflow as tf
 import gym
-
+import time
 
 from tensorflow.contrib.framework import *
 from tensorflow.contrib.layers import *
@@ -13,7 +13,7 @@ noise_magnitude = 1
 updates_per_step = 5
 batch_size = 100
 layer_sizes = [200, 200]
-monitor = False
+monitor = True
 num_eps = 100000000
 lr = 0.001
 reward_discount = 0.99
@@ -51,7 +51,10 @@ with tf.variable_scope("qnet"):
 ############
     for i in range(env.action_space.shape[0]):
         
-        qnet_col = tf.slice(qnet_pre_L, [0, i * env.action_space.shape[0] - (i * i - i)/2], [-1, env.action_space.shape[0] - i])
+        qnet_rest = tf.slice(qnet_pre_L, [0, 1 + i * env.action_space.shape[0] - (i * i - i)/2], [-1, env.action_space.shape[0] - 1 - i])
+        qnet_diag = tf.slice(qnet_pre_L, [0, i * env.action_space.shape[0] - (i * i - i)/2], [-1, 1])
+        qnet_diag = tf.exp(qnet_diag)
+        qnet_col = tf.concat(1, [qnet_diag, qnet_rest])
         qnet_col = tf.pad(qnet_col, [[0, 0], [i, 0]])
         if i == 0:
             qnet_L = tf.expand_dims(tf.transpose(qnet_col), 0)
@@ -91,7 +94,10 @@ with tf.variable_scope("tar"):
 ##########
     for i in range(env.action_space.shape[0]):
 
-        tar_col = tf.slice(tar_pre_L, [0, i * env.action_space.shape[0] - (i * i - i)/2], [-1, env.action_space.shape[0] - i])
+        tar_rest = tf.slice(tar_pre_L, [0, 1 + i * env.action_space.shape[0] - (i * i - i)/2], [-1, env.action_space.shape[0] - 1 - i])
+        tar_diag = tf.slice(tar_pre_L, [0, i * env.action_space.shape[0] - (i * i - i)/2], [-1, 1])
+        tar_diag = tf.exp(tar_diag)
+        tar_col = tf.concat(1, [tar_diag, tar_rest])
         tar_col = tf.pad(tar_col, [[0, 0], [i, 0]])
         if i == 0:
             tar_L = tf.expand_dims(tf.transpose(tar_col), 0)
@@ -130,7 +136,7 @@ for k in range(len(list(get_variables("qnet")))):
     tar_var = get_variables("tar")[k]
     sess.run(tar_var.assign(qnet_var))
 if monitor:
-    env.monitor.start("/monitor/" + environment + "_" + str(time.clock()))
+    env.monitor.start("/tmp/" + environment + "_" + str(time.clock()))
 
 for i_episode in range(num_eps):
     total_reward = 0
