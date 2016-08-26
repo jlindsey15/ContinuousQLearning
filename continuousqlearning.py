@@ -8,6 +8,8 @@ from tensorflow.contrib.layers import *
 import numpy as np
 
 
+
+
 batch_norm = False
 noise_magnitude = 1
 updates_per_step = 5
@@ -15,14 +17,20 @@ batch_size = 100
 layer_sizes = [200, 200]
 monitor = True
 num_eps = 100000000
-lr = 0.001
+lr = 0.0001
 reward_discount = 0.99
 noise_decay = 0.999
 target_update_rate = 0.001
+ou_theta = 0.15
+ou_sigma = 0.2
+
 environment = "Pendulum-v0"
 
 env = gym.make(environment)
+ou_cur = np.zeros(env.action_space.shape[0])
+
 terminate_after_steps = env.spec.timestep_limit
+
 
 sess = tf.Session()
 
@@ -148,7 +156,9 @@ for i_episode in range(num_eps):
         #env.render()
         
         mean_action = sess.run(qnet_mu, {qnet_obs: [state]})
-        action = mean_action[0] + noise_magnitude * np.random.randn(env.action_space.shape[0]) * np.power(noise_decay, i_episode)
+        #action = mean_action[0] + noise_magnitude * np.random.randn(env.action_space.shape[0]) * np.power(noise_decay, i_episode)
+        ou_cur = ou_sigma * np.random.randn(env.action_space.shape[0]) + (1 - ou_theta) * ou_cur
+        action = mean_action[0] + ou_cur
 
         last_state = state
         state, reward, done, info = env.step(action)
@@ -188,6 +198,7 @@ for i_episode in range(num_eps):
 
     
         if done:
+            ou_cur = np.zeros(env.action_space.shape[0])
             break
     print(str(i_episode) + ", " + str(total_reward))
                 
