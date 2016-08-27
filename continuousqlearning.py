@@ -10,7 +10,10 @@ import numpy as np
 
 
 
-batch_norm = False
+batch_norm_on = True
+if batch_norm_on:
+    normalizer_fn = batch_norm
+else: normalizer_fn = None
 noise_magnitude = 1
 updates_per_step = 5
 batch_size = 100
@@ -24,7 +27,7 @@ target_update_rate = 0.001
 ou_theta = 0.15
 ou_sigma = 0.2
 
-environment = "Pendulum-v0"
+environment = "Reacher-v1"
 
 env = gym.make(environment)
 ou_cur = np.zeros(env.action_space.shape[0])
@@ -41,21 +44,23 @@ with tf.variable_scope("qnet"):
     qnet_goal_Q = tf.placeholder(tf.float32, [None])
 
                     
-
+    
     qnet_curr = qnet_obs
+        #if batch_norm_on:
+        #qnet_curr = batch_norm(qnet_curr)
                                         
     for i in range(len(layer_sizes)):
         with tf.variable_scope('hidden_' + str(i)):
-            qnet_curr = fully_connected(qnet_curr, layer_sizes[i],activation_fn=tf.nn.relu, scope='hidden_' + str(i))
+            qnet_curr = fully_connected(qnet_curr, layer_sizes[i],activation_fn=tf.nn.relu, normalizer_fn=normalizer_fn, scope='hidden_' + str(i))
 
                                                         
     with tf.variable_scope('val'):
-        qnet_val = fully_connected(qnet_curr, 1, activation_fn=None, scope='V')
+        qnet_val = fully_connected(qnet_curr, 1, activation_fn=None, normalizer_fn=normalizer_fn, scope='V')
 
     with tf.variable_scope('pre_L'):
-        qnet_pre_L = fully_connected(qnet_curr, ((env.action_space.shape[0] + 1) * env.action_space.shape[0])/2, activation_fn=None, scope='l')
+        qnet_pre_L = fully_connected(qnet_curr, ((env.action_space.shape[0] + 1) * env.action_space.shape[0])/2, activation_fn=None, normalizer_fn=normalizer_fn, scope='l')
     with tf.variable_scope('mu'):
-        qnet_mu = fully_connected(qnet_curr, env.action_space.shape[0], activation_fn=None, scope='mu')
+        qnet_mu = fully_connected(qnet_curr, env.action_space.shape[0], activation_fn=None, normalizer_fn=normalizer_fn, scope='mu')
 ############
     for i in range(env.action_space.shape[0]):
         
@@ -90,15 +95,15 @@ with tf.variable_scope("tar"):
     
     for i in range(len(layer_sizes)):
         with tf.variable_scope('hidden_' + str(i)):
-            tar_curr = fully_connected(tar_curr, layer_sizes[i],activation_fn=tf.nn.relu, scope='hidden_' + str(i))
+            tar_curr = fully_connected(tar_curr, layer_sizes[i],activation_fn=tf.nn.relu, normalizer_fn=normalizer_fn,scope='hidden_' + str(i))
 
     with tf.variable_scope('val'):
-        tar_val = fully_connected(tar_curr, 1, activation_fn=None, scope='V')
+        tar_val = fully_connected(tar_curr, 1, activation_fn=None, normalizer_fn=normalizer_fn, scope='V')
 
     with tf.variable_scope('pre_L'):
-        tar_pre_L = fully_connected(tar_curr, ((env.action_space.shape[0] + 1) * env.action_space.shape[0])/2, activation_fn=None, scope='l')
+        tar_pre_L = fully_connected(tar_curr, ((env.action_space.shape[0] + 1) * env.action_space.shape[0])/2, activation_fn=None, normalizer_fn=normalizer_fn, scope='l')
     with tf.variable_scope('mu'):
-        tar_mu = fully_connected(tar_curr, env.action_space.shape[0], activation_fn=None, scope='mu')
+        tar_mu = fully_connected(tar_curr, env.action_space.shape[0], activation_fn=None, normalizer_fn=normalizer_fn, scope='mu')
 ##########
     for i in range(env.action_space.shape[0]):
 
@@ -150,6 +155,7 @@ for i_episode in range(num_eps):
     total_reward = 0
     print(environment)
     state = env.reset()
+    ou_cur = np.zeros(env.action_space.shape[0])
                     
     for t in range(0, terminate_after_steps):
         skip = False
